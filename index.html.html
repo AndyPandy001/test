@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSV Route Training Tracker</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        #stops {
+            margin-top: 20px;
+        }
+        .stop-item {
+            margin: 5px 0;
+        }
+        .stop-item button {
+            margin-left: 10px;
+        }
+        #buttonContainer {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin-top: 20px;
+        }
+        #buttonContainer button {
+            width: 40%;
+            margin: 0 5%;
+        }
+    </style>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCpUKIQ61BCsIDtlUk-BKPon7ozS-Lemkc&callback=initMap" async defer></script>
+</head>
+<body>
+    <h1>PSV Route Training Tracker</h1>
+    <div id="buttonContainer">
+        <button onclick="requestLocationPermission('start')">Start</button>
+        <button onclick="requestLocationPermission('stop')">Log Stop</button>
+        <button onclick="requestLocationPermission('via')">VIA Point</button>
+        <button onclick="requestLocationPermission('destination')">Destination</button>
+        <button onclick="plotRoute()">Plot Route</button>
+    </div>
+    <div id="stops">
+        <h2>Logged Stops:</h2>
+        <ul id="stopList"></ul>
+    </div>
+
+    <script>
+        let stopList = [];
+        let map; 
+
+        function initMap() {
+            // Initialize map if needed
+            // ... 
+        }
+
+        function requestLocationPermission(type = 'stop') {
+            const logStopButton = document.querySelector('button[onclick="requestLocationPermission(\'stop\')"]'); 
+            logStopButton.disabled = true;
+
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        logStop(position, type);
+                        logStopButton.disabled = false;
+                    },
+                    (error) => {
+                        handleLocationError(error);
+                        logStopButton.disabled = false;
+                    },
+                    {
+                        enableHighAccuracy: true,
+                        timeout: 5000,
+                        maximumAge: 0
+                    }
+                );
+            } else {
+                alert('Geolocation is not supported by this browser.');
+            }
+        }
+
+        function handleLocationError(error) {
+            let errorMessage = "An error occurred while getting your location.";
+            switch (error.code) {
+                case error.PERMISSION_DENIED:
+                    errorMessage = "Permission to access your location was denied.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    errorMessage = "Location information is unavailable.";
+                    break;
+                case error.TIMEOUT:
+                    errorMessage = "The request to get your location timed out.";
+                    break;
+                case error.UNKNOWN_ERROR:
+                    errorMessage = "An unknown error occurred.";
+                    break;
+            }
+            alert(errorMessage);
+            console.error("Geolocation error:", error);
+        }
+
+        function logStop(position, type) {
+            const { latitude, longitude } = position.coords;
+            const stop = { latitude, longitude, type };
+            stopList.push(stop);
+            updateStopList();
+        }
+
+        function updateStopList() {
+            const stopListElement = document.getElementById('stopList');
+            stopListElement.innerHTML = '';
+            stopList.forEach((stop, index) => {
+                const stopItem = document.createElement('li');
+                stopItem.className = 'stop-item';
+                stopItem.innerHTML = `Stop ${index + 1} (${stop.type}) at: ${stop.latitude}, ${stop.longitude}`;
+                const openButton = document.createElement('button');
+                openButton.innerText = 'Open in Google Maps';
+                openButton.onclick = () => openInMaps(stop.latitude, stop.longitude);
+                stopItem.appendChild(openButton);
+                stopListElement.appendChild(stopItem);
+            });
+        }
+
+        function openInMaps(latitude, longitude) {
+            const url = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+            window.open(url, '_blank');
+        }
+
+        function plotRoute() {
+            if (stopList.length < 2) {
+                alert("Please log at least two stops to plot a route.");
+                return;
+            }
+            const waypoints = stopList.slice(1, -1).map(stop => ({
+                location: { lat: stop.latitude, lng: stop.longitude },
+                stopover: true
+            }));
+
+            const origin = { lat: stopList[0].latitude, lng: stopList[0].longitude }; 
+            const destination = { lat: stopList[stopList.length - 1].latitude, lng: stopList[stopList.length - 1].longitude }; 
+
+            const request = {
+                origin: origin,
+                destination: destination,
+                waypoints: waypoints,
+                optimizeWaypoints: true, 
+                travelMode: 'DRIVING'
+            };
+
+            const directionsService = new google.maps.DirectionsService();
+            directionsService.route(request, function(result, status) {
+                if (status === 'OK') {
+                    const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${destination.lat},${destination.lng}&waypoints=${waypoints.map(wp => `${wp.location.lat},${wp.location.lng}`).join('|')}&travelmode=driving`;
+                    window.open(directionsUrl, '_blank');
+                } else {
+                    alert('Directions request failed due to ' + status);
+                }
+            });
+        }
+    </script>
+</body>
+</html>
